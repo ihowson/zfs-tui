@@ -17,14 +17,17 @@ var (
 )
 
 type model struct {
-	fsName     string
-	snapshots  []snapshotItem
-	selected   map[int]bool
-	cursor     int
-	loading    bool
-	err        error
-	confirming bool
-	msg        string
+	fsName       string
+	snapshots    []snapshotItem
+	selected     map[int]bool
+	cursor       int
+	loading      bool
+	err          error
+	confirming   bool
+	msg          string
+	destroyQueue []string
+	destroyTotal int
+	destroyDone  int
 }
 
 func initialModel(fsName string) model {
@@ -40,10 +43,7 @@ type loadedMsg struct {
 	err       error
 }
 
-type destroyDoneMsg struct {
-	err error
-	n   int
-}
+type destroyNextMsg struct{}
 
 func (m model) Init() tea.Cmd {
 	return func() tea.Msg {
@@ -59,11 +59,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.msg = ""
 			return m, nil
 		}
+		if len(m.destroyQueue) > 0 {
+			return m, nil
+		}
 		if m.confirming {
 			switch msg.String() {
 			case "y", "Y":
 				m.confirming = false
-				return m, m.destroySelected()
+				return m, m.beginDestroy()
 			case "n", "N", "esc":
 				m.confirming = false
 			}
@@ -103,38 +106,55 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.snapshots = msg.snapshots
 		}
 
-	case destroyDoneMsg:
-		if msg.err != nil {
-			m.msg = fmt.Sprintf("destroy failed: %v", msg.err)
-		} else {
-			m.msg = fmt.Sprintf("destroyed %d snapshot(s)", msg.n)
+	case destroyNextMsg:
+		if len(m.destroyQueue) == 0 {
+			m.msg = fmt.Sprintf("destroyed %d snapshot(s)", m.destroyDone)
+			m.destroyDone = 0
+			m.destroyTotal = 0
 			return m, func() tea.Msg {
 				snaps, err := listSnapshots(m.fsName)
 				return loadedMsg{snapshots: snaps, err: err}
 			}
+		}
+		name := m.destroyQueue[0]
+		if err := destroySnapshot(name); err != nil {
+			m.msg = fmt.Sprintf("destroy failed: %v", err)
+			m.destroyQueue = nil
+			m.destroyDone = 0
+			m.destroyTotal = 0
+			return m, func() tea.Msg {
+				snaps, err := listSnapshots(m.fsName)
+				return loadedMsg{snapshots: snaps, err: err}
+			}
+		}
+		m.destroyDone++
+		m.destroyQueue = m.destroyQueue[1:]
+		for i, snap := range m.snapshots {
+			if snap.Name == name {
+				delete(m.selected, i)
+				break
+			}
+		}
+		return m, func() tea.Msg {
+			return destroyNextMsg{}
 		}
 	}
 
 	return m, nil
 }
 
-func (m model) destroySelected() tea.Cmd {
-	var toDestroy []int
+func (m model) beginDestroy() tea.Cmd {
+	m.destroyQueue = nil
+	m.destroyDone = 0
+	m.destroyTotal = 0
 	for i, v := range m.selected {
 		if v {
-			toDestroy = append(toDestroy, i)
+			m.destroyQueue = append(m.destroyQueue, m.snapshots[i].Name)
 		}
 	}
+	m.destroyTotal = len(m.destroyQueue)
 	return func() tea.Msg {
-		count := 0
-		for _, idx := range toDestroy {
-			if err := destroySnapshot(m.snapshots[idx].Name); err != nil {
-				return destroyDoneMsg{err: err, n: count}
-			}
-			delete(m.selected, idx)
-			count++
-		}
-		return destroyDoneMsg{err: nil, n: count}
+		return destroyNextMsg{}
 	}
 }
 
@@ -164,19 +184,27 @@ func (m model) View() string {
 			if m.selected[i] {
 				sel = selectedStyle.Render("x")
 			}
-			used := formatBytes(snap.Used)
 			snapName := snap.Name
 			if idx := strings.Index(snapName, "@"); idx >= 0 {
 				snapName = snapName[idx+1:]
 			}
-			line := fmt.Sprintf("%s[%s] %-40s %s", prefix, sel, snapName, used)
+			line := fmt.Sprintf("%s[%s] %-40s Used: %-10s Refer: %s",
+				prefix, sel, snapName, formatBytes(snap.Used), formatBytes(snap.Refer))
 			b.WriteString(line)
 			b.WriteString("\n")
 		}
 		b.WriteString("\n")
 	}
 
-	if m.confirming {
+	if len(m.destroyQueue) > 0 {
+		done := m.destroyDone
+		total := m.destroyTotal
+		current := m.destroyQueue[0]
+		if idx := strings.Index(current, "@"); idx >= 0 {
+			current = current[idx+1:]
+		}
+		b.WriteString(fmt.Sprintf("Destroying %s... (%d/%d)\n", current, done+1, total))
+	} else if m.confirming {
 		b.WriteString(confirmStyle.Render("Destroy selected snapshots? (y/n): "))
 	} else if m.msg != "" {
 		b.WriteString(dimStyle.Render(m.msg))

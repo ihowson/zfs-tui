@@ -2,6 +2,10 @@
 
 Always keep this file up to date with your learnings.
 
+Always keep REQUIREMENTS.md up to date with ISO 2219 requirements for the project.
+
+Always keep README.md up to date with the project overview and usage.
+
 ## Toolchain
 
 - **Language**: Go 1.24+

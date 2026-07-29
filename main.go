@@ -13,6 +13,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if os.Geteuid() != 0 {
+		fmt.Fprintf(os.Stderr, "Warning: not running as root — ZFS operations may fail\n")
+	}
+
 	p := tea.NewProgram(initialModel(os.Args[1]), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

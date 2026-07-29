@@ -7,8 +7,9 @@ import (
 )
 
 type snapshotItem struct {
-	Name string
-	Used uint64
+	Name  string
+	Used  uint64
+	Refer uint64
 }
 
 func listSnapshots(fsName string) ([]snapshotItem, error) {
@@ -18,7 +19,7 @@ func listSnapshots(fsName string) ([]snapshotItem, error) {
 	}
 	items := make([]snapshotItem, len(datasets))
 	for i, ds := range datasets {
-		items[i] = snapshotItem{Name: ds.Name, Used: ds.Used}
+		items[i] = snapshotItem{Name: ds.Name, Used: ds.Used, Refer: ds.Referenced}
 	}
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].Name < items[j].Name

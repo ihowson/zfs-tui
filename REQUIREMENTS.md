@@ -1,5 +1,12 @@
 # Requirements
 
+## 2026-07-24
+
+- Show both `used` and `refer` sizes in snapshot list
+- Display progress during destroy operations (snapshot name + count)
+- Warn user if not running as root
+- Batch destroy correctly removes all selected snapshots in sequence
+
 ## 2026-07-22
 
 - CLI takes a ZFS filesystem name as a positional argument
