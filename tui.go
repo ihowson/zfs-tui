@@ -17,17 +17,19 @@ var (
 )
 
 type model struct {
-	fsName       string
-	snapshots    []snapshotItem
-	selected     map[int]bool
-	cursor       int
-	loading      bool
-	err          error
-	confirming   bool
-	msg          string
-	destroyQueue []string
-	destroyTotal int
-	destroyDone  int
+	fsName        string
+	snapshots     []snapshotItem
+	selected      map[int]bool
+	cursor        int
+	loading       bool
+	err           error
+	confirming    bool
+	msg           string
+	destroyQueue  []string
+	destroyTotal  int
+	destroyDone   int
+	destroyingNow string
+	poolAvail     uint64
 }
 
 func initialModel(fsName string) model {
@@ -40,15 +42,24 @@ func initialModel(fsName string) model {
 
 type loadedMsg struct {
 	snapshots []snapshotItem
+	avail     uint64
 	err       error
 }
 
 type destroyNextMsg struct{}
+type destroyResultMsg struct {
+	name string
+	err  error
+}
 
 func (m model) Init() tea.Cmd {
 	return func() tea.Msg {
 		snaps, err := listSnapshots(m.fsName)
-		return loadedMsg{snapshots: snaps, err: err}
+		var avail uint64
+		if err == nil {
+			avail, _ = poolAvail(m.fsName)
+		}
+		return loadedMsg{snapshots: snaps, avail: avail, err: err}
 	}
 }
 
@@ -57,16 +68,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if m.msg != "" {
 			m.msg = ""
-			return m, nil
 		}
 		if len(m.destroyQueue) > 0 {
 			return m, nil
 		}
 		if m.confirming {
 			switch msg.String() {
-			case "y", "Y":
-				m.confirming = false
-				return m, m.beginDestroy()
+		case "y", "Y":
+			m.confirming = false
+			m.destroyQueue = nil
+			m.destroyDone = 0
+			m.destroyTotal = 0
+			for i, v := range m.selected {
+				if v {
+					m.destroyQueue = append(m.destroyQueue, m.snapshots[i].Name)
+				}
+			}
+			m.destroyTotal = len(m.destroyQueue)
+			return m, func() tea.Msg {
+				return destroyNextMsg{}
+			}
 			case "n", "N", "esc":
 				m.confirming = false
 			}
@@ -96,6 +117,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
+		case "r":
+			return m, func() tea.Msg {
+				snaps, err := listSnapshots(m.fsName)
+				var avail uint64
+				if err == nil {
+					avail, _ = poolAvail(m.fsName)
+				}
+				return loadedMsg{snapshots: snaps, avail: avail, err: err}
+			}
 		}
 
 	case loadedMsg:
@@ -104,6 +134,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 		} else {
 			m.snapshots = msg.snapshots
+			m.poolAvail = msg.avail
+			if m.cursor >= len(m.snapshots) {
+				m.cursor = len(m.snapshots) - 1
+			}
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
 		}
 
 	case destroyNextMsg:
@@ -113,24 +150,40 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.destroyTotal = 0
 			return m, func() tea.Msg {
 				snaps, err := listSnapshots(m.fsName)
-				return loadedMsg{snapshots: snaps, err: err}
+				var avail uint64
+				if err == nil {
+					avail, _ = poolAvail(m.fsName)
+				}
+				return loadedMsg{snapshots: snaps, avail: avail, err: err}
 			}
 		}
 		name := m.destroyQueue[0]
-		if err := destroySnapshot(name); err != nil {
-			m.msg = fmt.Sprintf("destroy failed: %v", err)
+		m.destroyingNow = name
+		return m, func() tea.Msg {
+			err := destroySnapshot(name)
+			return destroyResultMsg{name: name, err: err}
+		}
+
+	case destroyResultMsg:
+		m.destroyingNow = ""
+		if msg.err != nil {
+			m.msg = fmt.Sprintf("destroy failed: %v", msg.err)
 			m.destroyQueue = nil
 			m.destroyDone = 0
 			m.destroyTotal = 0
 			return m, func() tea.Msg {
 				snaps, err := listSnapshots(m.fsName)
-				return loadedMsg{snapshots: snaps, err: err}
+				var avail uint64
+				if err == nil {
+					avail, _ = poolAvail(m.fsName)
+				}
+				return loadedMsg{snapshots: snaps, avail: avail, err: err}
 			}
 		}
 		m.destroyDone++
 		m.destroyQueue = m.destroyQueue[1:]
 		for i, snap := range m.snapshots {
-			if snap.Name == name {
+			if snap.Name == msg.name {
 				delete(m.selected, i)
 				break
 			}
@@ -141,21 +194,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
-}
-
-func (m model) beginDestroy() tea.Cmd {
-	m.destroyQueue = nil
-	m.destroyDone = 0
-	m.destroyTotal = 0
-	for i, v := range m.selected {
-		if v {
-			m.destroyQueue = append(m.destroyQueue, m.snapshots[i].Name)
-		}
-	}
-	m.destroyTotal = len(m.destroyQueue)
-	return func() tea.Msg {
-		return destroyNextMsg{}
-	}
 }
 
 func (m model) View() string {
@@ -169,6 +207,8 @@ func (m model) View() string {
 	var b strings.Builder
 
 	b.WriteString(titleStyle.Render(fmt.Sprintf("Snapshots of %s", m.fsName)))
+	b.WriteString("  ")
+	b.WriteString(dimStyle.Render(fmt.Sprintf("Free: %s", formatBytes(m.poolAvail))))
 	b.WriteString("\n\n")
 
 	if len(m.snapshots) == 0 {
@@ -196,10 +236,10 @@ func (m model) View() string {
 		b.WriteString("\n")
 	}
 
-	if len(m.destroyQueue) > 0 {
+	if m.destroyingNow != "" {
 		done := m.destroyDone
 		total := m.destroyTotal
-		current := m.destroyQueue[0]
+		current := m.destroyingNow
 		if idx := strings.Index(current, "@"); idx >= 0 {
 			current = current[idx+1:]
 		}
@@ -210,7 +250,7 @@ func (m model) View() string {
 		b.WriteString(dimStyle.Render(m.msg))
 		b.WriteString("\n")
 	} else {
-		b.WriteString(dimStyle.Render("j/k navigate · x select · D destroy · q quit"))
+		b.WriteString(dimStyle.Render("j/k navigate · x select · D destroy · r refresh · q quit"))
 	}
 
 	return b.String()
