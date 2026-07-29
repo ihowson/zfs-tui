@@ -2,7 +2,7 @@
 
 Always keep this file up to date with your learnings.
 
-Always keep REQUIREMENTS.md up to date with RFC 2219 requirements for the project.
+Always keep REQUIREMENTS.md up to date with project requirements in RFC 2219 format.
 
 Always keep README.md up to date with the project overview and usage.
 
@@ -10,7 +10,6 @@ Always keep README.md up to date with the project overview and usage.
 
 - **Language**: Go 1.24+
 - **TUI framework**: `github.com/charmbracelet/bubbletea`
-- **TUI components**: `github.com/charmbracelet/bubbles`
 - **Styling**: `github.com/charmbracelet/lipgloss`
 - **ZFS interface**: `github.com/mistifyio/go-zfs/v4` (shells out to `zfs` CLI, no CGO)
 
@@ -32,8 +31,11 @@ go mod tidy
 ## Conventions
 
 - All ZFS interaction goes through `snapshot.go` (wraps `go-zfs`).
+- `snapshot.go` also provides `poolAvail` and `poolName` helpers.
 - All TUI rendering goes through `tui.go` (bubbletea model).
-- `main.go` is minimal: parse CLI arg, start program.
-- Destroy confirmation is a modal overlay in the TUI.
+- `main.go` is minimal: parse CLI arg, check EUID, start program.
+- Destroy uses async message chaining (`destroyNextMsg` → goroutine → `destroyResultMsg`) for inline progress display.
+- Messages sent to the event loop are the sole mechanism for model mutations — no goroutine directly touches the model.
+- Cursor is clamped to `[0, len(snapshots)-1]` after any list reload.
 - Error messages are displayed inline, not via debug logs.
 - Commit messages are written in the imperative mood.
