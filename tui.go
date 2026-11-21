@@ -117,7 +117,6 @@ func initialModel(root string) model {
 // refreshed by startLoad and dropped entirely when 'r' is pressed.
 type datasetCache struct {
 	children []datasetItem
-	avail    uint64
 }
 
 // datasetsMsg carries the child datasets of one dataset. Results for a dataset
@@ -125,7 +124,6 @@ type datasetCache struct {
 type datasetsMsg struct {
 	dataset  string
 	children []datasetItem
-	avail    uint64
 	err      error
 }
 
@@ -134,6 +132,7 @@ type datasetsMsg struct {
 type snapshotsMsg struct {
 	dataset   string
 	snapshots []snapshotItem
+	avail     uint64
 	err       error
 }
 
@@ -200,11 +199,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.err = nil
 		m.children = msg.children
-		m.avail = msg.avail
-		m.cache[msg.dataset] = datasetCache{children: msg.children, avail: msg.avail}
+		m.cache[msg.dataset] = datasetCache{children: msg.children}
 		m.clampCursors()
 		if msg.dataset == "" {
 			m.snapshots = nil
+			m.avail = 0
 			return m, nil
 		}
 		m.loadingSnapshots = true
@@ -221,6 +220,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.err = nil
 		m.snapshots = msg.snapshots
+		m.avail = msg.avail
 		m.pruneSelection()
 		m.clampCursors()
 
@@ -349,7 +349,6 @@ func (m model) navigate(target string) (tea.Model, tea.Cmd) {
 
 	if cached, ok := m.cache[target]; ok {
 		m.children = cached.children
-		m.avail = cached.avail
 		m.loadingDatasets = false
 		if target == "" {
 			m.loadingSnapshots = false
@@ -376,14 +375,18 @@ func loadDatasets(dataset string) datasetsMsg {
 	if err != nil {
 		return datasetsMsg{dataset: dataset, err: err}
 	}
-	avail, _ := poolAvail(dataset)
-	return datasetsMsg{dataset: dataset, children: children, avail: avail}
+	return datasetsMsg{dataset: dataset, children: children}
 }
 
 func loadSnapshotsCmd(dataset string) tea.Cmd {
 	return func() tea.Msg {
 		snapshots, err := listSnapshots(dataset)
-		return snapshotsMsg{dataset: dataset, snapshots: snapshots, err: err}
+		if err != nil {
+			return snapshotsMsg{dataset: dataset, err: err}
+		}
+		// Free space is not cached: it changes between navigations.
+		avail, _ := poolAvail(dataset)
+		return snapshotsMsg{dataset: dataset, snapshots: snapshots, avail: avail}
 	}
 }
 

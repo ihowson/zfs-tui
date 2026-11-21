@@ -50,7 +50,7 @@ The dataset pane lists the immediate child datasets of the dataset named in the 
 
 The snapshot pane always shows the snapshots of the dataset named in the header, and asks you to select a pool while none is selected. Selection is kept by snapshot name, so it survives refreshes.
 
-Child datasets are loaded and drawn before the snapshots of the current dataset are queried, so the browser is usable while the snapshot listing is still in flight. Child listings are cached per dataset: revisiting a dataset redraws its children immediately and only reloads the snapshots. Press `r` to discard the cache and refetch the current dataset.
+Child datasets are loaded and drawn before the snapshots of the current dataset are queried, so the browser is usable while the snapshot listing is still in flight. Child listings are cached per dataset: revisiting a dataset redraws its children immediately and only reloads the snapshots. Free space is not cached — it is re-read with each snapshot load. Press `r` to discard the cache and refetch the current dataset.
 
 The dataset pane starts with a `pool` row naming the pool you are inside, so the location in the tree stays visible while you descend.
 

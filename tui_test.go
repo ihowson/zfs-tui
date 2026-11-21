@@ -464,3 +464,26 @@ func TestRefreshDropsDatasetCache(t *testing.T) {
 		t.Fatalf("navigation after refresh must refetch children")
 	}
 }
+
+func TestFreeSpaceRefreshedOnCachedNavigation(t *testing.T) {
+	m := newTestModel()
+	m = loadAll(t, m, "tank/data", []string{"tank/data/a"}, nil)
+
+	m = press(t, m, runeKey("enter"))
+	m = press(t, m, datasetsMsg{dataset: "tank/data/a"})
+	m = press(t, m, snapshotsMsg{dataset: "tank/data/a", avail: 555})
+	if m.avail != 555 {
+		t.Fatalf("avail = %d, want 555 from the snapshot result", m.avail)
+	}
+
+	// Ascending hits the children cache, but free space must not come from it.
+	next, cmd := m.Update(runeKey("backspace"))
+	m = next.(model)
+	if cmd == nil {
+		t.Fatalf("cached navigation must still load snapshots and free space")
+	}
+	m = press(t, m, snapshotsMsg{dataset: "tank/data", avail: 42})
+	if m.avail != 42 {
+		t.Fatalf("avail = %d, want refreshed 42", m.avail)
+	}
+}
