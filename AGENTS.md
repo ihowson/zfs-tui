@@ -27,6 +27,10 @@ go mod tidy
 
 `go test ./...` needs no ZFS pool; it exercises the model, layout, and formatting.
 
+## CI
+
+`.github/workflows/ci.yml` and `.gitea/workflows/ci.yml` must stay in sync: gofmt check, `go vet`, `go test -race`, and `./build.sh` for both hosts. The Gitea copy omits the artifact upload (`actions/upload-artifact@v3` is rejected by actionlint and v4 needs a recent act_runner) and disables `setup-go` caching.
+
 ## Test Setup
 
 - Test pool: `sudo /tmp/setup-zfs-test.sh` (file-backed, no real disks needed; recreate it if missing)

@@ -105,6 +105,8 @@ Outputs `dist/zfs-tui-linux-amd64` and `dist/zfs-tui-linux-arm64` (`OUT=... ./bu
 
 ## Testing
 
+CI runs on GitHub Actions and Gitea Actions (`.github/workflows/ci.yml`, `.gitea/workflows/ci.yml`): gofmt, `go vet`, `go test -race`, and the cross-compile.
+
 Unit tests cover the browser state machine and layout; they do not need a ZFS pool:
 
 ```sh
