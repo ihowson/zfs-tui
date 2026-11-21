@@ -2,7 +2,7 @@
 
 Always keep this file up to date with your learnings.
 
-Always keep REQUIREMENTS.md up to date with project requirements in RFC 2219 format.
+Always keep REQUIREMENTS.md up to date with project requirements in RFC 2119 format.
 
 Always keep README.md up to date with the project overview and usage.
 
@@ -11,6 +11,7 @@ Always keep README.md up to date with the project overview and usage.
 - **Language**: Go 1.24+
 - **TUI framework**: `github.com/charmbracelet/bubbletea`
 - **Styling**: `github.com/charmbracelet/lipgloss`
+- **Key bindings**: `github.com/charmbracelet/bubbles/key`
 - **ZFS interface**: `github.com/mistifyio/go-zfs/v4` (shells out to `zfs` CLI, no CGO)
 
 ## Build & Verify
@@ -19,23 +20,36 @@ Always keep README.md up to date with the project overview and usage.
 export GOTOOLCHAIN=go1.24.2
 go build -o zfs-tui .
 go vet ./...
+go test ./...
+./build.sh   # cross-compile static linux binaries (amd64, arm64) into dist/
 go mod tidy
 ```
 
+`go test ./...` needs no ZFS pool; it exercises the model, layout, and formatting.
+
 ## Test Setup
 
-- Test pool: `sudo /tmp/setup-zfs-test.sh` (file-backed, no real disks needed)
+- Test pool: `sudo /tmp/setup-zfs-test.sh` (file-backed, no real disks needed; recreate it if missing)
 - Usage: `sudo ./zfs-tui testpool/data`
 - Teardown: `sudo /tmp/setup-zfs-test.sh --teardown testpool`
+- The program exits non-zero before starting the TUI without root, without `zfs` in `PATH`, or when the argument is not an existing ZFS filesystem.
 
 ## Conventions
 
-- All ZFS interaction goes through `snapshot.go` (wraps `go-zfs`).
-- `snapshot.go` also provides `poolAvail` and `poolName` helpers.
-- All TUI rendering goes through `tui.go` (bubbletea model).
-- `main.go` is minimal: parse CLI arg, check EUID, start program.
-- Destroy uses async message chaining (`destroyNextMsg` → goroutine → `destroyResultMsg`) for inline progress display.
+- All ZFS interaction goes through `zfs.go` (wraps `go-zfs`): `checkFilesystem`, `listPools`, `listChildren`, `listSnapshots`, `poolAvail`, `poolName`, `destroySnapshot`.
+- `main.go` parses flags and gates startup on `checkPrivileges`, plus `checkFilesystem` when an argument was given; the UI starts only when they pass. Zero arguments is valid and starts at the pool list.
+- All TUI rendering and state live in `tui.go`; tests live in `tui_test.go`.
+- The UI is a two-pane browser: dataset pane lists immediate children of `current`, snapshot pane lists snapshots of `current`. `root` is the browse boundary; `parentDataset` never ascends past it.
+- `root` and `current` may both be `""`, the virtual pool level: `loadDataset("")` calls `listPools`, the pane shows root datasets, the snapshot pane shows a hint, and `parentDataset(pool, "")` returns `""` so `..` returns to the pool list. The argument is optional (`zfs-tui [filesystem]`).
+- Keys are dispatched with `key.Matches` against `keyMap` bindings, not raw string switches.
+- Palette lives in the `var` block at the top of `tui.go` (`accentStyle`, `pathStyle`, `poolStyle`, `dirStyle`, `dimStyle`, `selectedStyle`, `okStyle`, `busyStyle`, `dangerStyle`, `borderFocus`, `borderBlur`). Reuse these instead of new `lipgloss.Color` literals.
+- Long-running work is animated with `bubbles/spinner`: every transition into a busy state returns `m.spin.Tick`, `spinner.TickMsg` is dropped when `busy()` is false. Loading panes show `spinnerLine(...)`, never the empty-state text.
+- Footer status uses `statusOK` to pick green/red; destroy failures must be red.
+- Loading is staged: `startLoad` requests `datasetsMsg`; the `datasetsMsg` handler stores the children and returns `loadSnapshotsCmd`, and `snapshotsMsg` fills the snapshot pane. Do not fold the two back into one command — the browser must appear before snapshots resolve.
+- `-color` (`color.go`) configures the lipgloss profile before the program starts: `auto` honours `NO_COLOR`/`CLICOLOR_FORCE` and falls back to `ANSI256` when stdout is a TTY but detection reports no color. Tests force the profile with `lipgloss.SetColorProfile` when they assert color output.
+- Snapshot selection is a `map[string]bool` keyed by full snapshot name; prune it on every reload. Cursors are clamped after every reload.
+- Destroy uses async message chaining (`destroyCmd` → goroutine → `destroyResultMsg`) for inline progress display; input is ignored while the queue is non-empty.
 - Messages sent to the event loop are the sole mechanism for model mutations — no goroutine directly touches the model.
-- Cursor is clamped to `[0, len(snapshots)-1]` after any list reload.
-- Error messages are displayed inline, not via debug logs.
+- Errors are shown inline in the footer, not via debug logs.
+- Keep the view within terminal bounds: every rendered line must be exactly `width` cells, and the view exactly `height` lines (`TestViewFitsTerminal` enforces this).
 - Commit messages are written in the imperative mood.
