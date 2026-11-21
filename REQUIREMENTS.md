@@ -23,6 +23,8 @@ Keywords follow RFC 2119: MUST, MUST NOT, SHOULD, MAY.
 - The focused pane MUST be visually distinct from the unfocused pane
 - Child datasets MUST be loaded and rendered before the snapshots of the same dataset are requested, and the snapshot pane MUST show progress while that request is in flight
 - Child dataset listings MUST be cached per dataset and reused when navigating back to a dataset, without refetching it; snapshots MUST still be reloaded
+- The snapshot pane title MUST name the dataset whose snapshots are listed
+- The destroy confirmation MUST name that dataset
 - The cache MUST hold child listings only; pool free space MUST be re-read whenever snapshots are loaded
 - `r` MUST discard the cached dataset listings and refetch the current dataset
 - The CLI MUST accept `-color auto|always|never`; `auto` MUST honour `NO_COLOR` and `CLICOLOR_FORCE` and MUST fall back to a 256-color profile on a TTY when environment-based detection reports no color support

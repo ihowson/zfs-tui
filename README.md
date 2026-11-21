@@ -36,14 +36,14 @@ sudo ./zfs-tui tank/data
 ```
 zfs-tui  tank/data  Free: 233.0 MiB
 ╭─────────────────────────╮ ╭──────────────────────────────────────────────────────────────────────╮
-│Datasets (3)             │ │Snapshots (4, 1 selected) · used / refer                              │
+│Datasets (3)             │ │Snapshots of tank/data · 4, 1 selected · used / refer                 │
 │─────────────────────────│ │──────────────────────────────────────────────────────────────────────│
 │pool tank                │ │  [ ] media-2026-11-20                             1.0 GiB   256.0 KiB│
 │▸ backups                │ │  [ ] media-2026-11-19                           512.0 MiB   128.0 KiB│
 │  media                  │ │▸ [x] weekly-2026-11-17                            3.0 GiB    64.0 MiB│
 │  vm                     │ │  [ ] weekly-2026-11-10                                0 B         0 B│
 ╰─────────────────────────╯ ╰──────────────────────────────────────────────────────────────────────╯
-tab pane · enter descend · bksp up · x select · D destroy · r refresh · q quit
+Destroy 1 snapshot(s) in tank/data? (y/n)
 ```
 
 The dataset pane lists the immediate child datasets of the dataset named in the header; `..` appears while you are below the starting point. Started without an argument, the header reads `pools` and the pane lists every pool; descending into a pool shows its filesystems, and `..` returns to the pool list. With an argument the starting point is that filesystem, and `..` never ascends above it.
@@ -82,7 +82,7 @@ Destroys show `⠋ destroying snap-b… (2/4)` in the footer while the queue dra
 | `r` | Discard the dataset cache and refresh the current dataset |
 | `q` / `ctrl+c` | Quit |
 
-Destroy prompts with `Destroy N selected snapshot(s)? (y/n):`; press `y` to confirm or `n`/`esc` to cancel. Each destroy is displayed inline: `Destroying snap-b… (2/4)`.
+The snapshot pane title names the dataset being listed, and destroy prompts with `Destroy N snapshot(s) in <dataset>? (y/n)`; press `y` to confirm or `n`/`esc` to cancel. Each destroy is displayed inline: `Destroying snap-b… (2/4)`.
 
 Terminals smaller than 50x10 show a message instead of the panes.
 

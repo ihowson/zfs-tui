@@ -495,11 +495,11 @@ func (m model) snapshotTitle() string {
 	if m.current == "" {
 		return "Snapshots"
 	}
-	n := len(m.snapshots)
+	counts := fmt.Sprintf("%d", len(m.snapshots))
 	if sel := len(m.selected); sel > 0 {
-		return fmt.Sprintf("Snapshots (%d, %d selected) · used / refer", n, sel)
+		counts = fmt.Sprintf("%d, %d selected", len(m.snapshots), sel)
 	}
-	return fmt.Sprintf("Snapshots (%d) · used / refer", n)
+	return fmt.Sprintf("Snapshots of %s · %s · used / refer", m.current, counts)
 }
 
 // datasetLines renders the visible dataset rows for a pane of the given size.
@@ -617,7 +617,7 @@ func (m model) footer() string {
 		line = m.spin.View() + " " + busyStyle.Render(fmt.Sprintf("destroying %s… (%d/%d)",
 			shortSnapshotName(m.destroying), m.destroyDone+1, m.destroySize))
 	case m.confirming:
-		line = dangerStyle.Render(fmt.Sprintf("Destroy %d selected snapshot(s)? (y/n)", len(m.selected)))
+		line = dangerStyle.Render(fmt.Sprintf("Destroy %d snapshot(s) in %s? (y/n)", len(m.selected), m.current))
 	case m.err != nil:
 		line = dangerStyle.Render("Error: " + m.err.Error())
 	case m.status != "":

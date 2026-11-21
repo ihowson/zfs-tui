@@ -44,6 +44,7 @@ go mod tidy
 - Keys are dispatched with `key.Matches` against `keyMap` bindings, not raw string switches.
 - Palette lives in the `var` block at the top of `tui.go` (`accentStyle`, `pathStyle`, `poolStyle`, `dirStyle`, `dimStyle`, `selectedStyle`, `okStyle`, `busyStyle`, `dangerStyle`, `borderFocus`, `borderBlur`). Reuse these instead of new `lipgloss.Color` literals.
 - Long-running work is animated with `bubbles/spinner`: every transition into a busy state returns `m.spin.Tick`, `spinner.TickMsg` is dropped when `busy()` is false. Loading panes show `spinnerLine(...)`, never the empty-state text.
+- The snapshot pane title and the destroy prompt both include `current`, so the operator can never confuse which dataset's snapshots are listed or queued.
 - Footer status uses `statusOK` to pick green/red; destroy failures must be red.
 - `model.cache` maps a dataset name (including `""` for the pool list) to its `datasetCache`; it is filled by the `datasetsMsg` handler and read by `navigate`, which then only schedules the snapshot load. `r` clears the map. Snapshots and pool free space are never cached: both arrive in `snapshotsMsg`.
 - Loading is staged: `startLoad` requests `datasetsMsg`; the `datasetsMsg` handler stores the children and returns `loadSnapshotsCmd`, and `snapshotsMsg` fills the snapshot pane. Do not fold the two back into one command — the browser must appear before snapshots resolve.

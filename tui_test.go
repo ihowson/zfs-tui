@@ -487,3 +487,20 @@ func TestFreeSpaceRefreshedOnCachedNavigation(t *testing.T) {
 		t.Fatalf("avail = %d, want refreshed 42", m.avail)
 	}
 }
+
+func TestSnapshotPaneNamesDataset(t *testing.T) {
+	m := newTestModel()
+	m = loadAll(t, m, "tank/data", []string{"tank/data/a"}, []string{"s1", "s2"})
+
+	view := m.View()
+	if !strings.Contains(view, "Snapshots of tank/data") {
+		t.Errorf("snapshot pane does not name the dataset:\n%s", view)
+	}
+
+	m = press(t, m, runeKey("tab"))
+	m = press(t, m, runeKey("x"))
+	m = press(t, m, runeKey("D"))
+	if got := m.View(); !strings.Contains(got, "in tank/data?") {
+		t.Errorf("destroy prompt does not name the dataset:\n%s", got)
+	}
+}
