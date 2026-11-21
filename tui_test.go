@@ -414,3 +414,53 @@ func TestColorProfileModes(t *testing.T) {
 		t.Errorf("CLICOLOR_FORCE: %v, want TrueColor", got)
 	}
 }
+
+func TestNavigationUsesCachedDatasets(t *testing.T) {
+	m := newTestModel()
+	m = loadAll(t, m, "tank/data", []string{"tank/data/a"}, []string{"s1"})
+
+	m = press(t, m, runeKey("enter")) // into tank/data/a, not cached yet
+	m = press(t, m, datasetsMsg{dataset: "tank/data/a", children: datasetItems([]string{"tank/data/a/x"})})
+	m = press(t, m, snapshotsMsg{dataset: "tank/data/a"})
+
+	// Ascending to tank/data must use the cached children and only load snapshots.
+	next, cmd := m.Update(runeKey("backspace"))
+	m = next.(model)
+	if m.current != "tank/data" {
+		t.Fatalf("current = %q, want tank/data", m.current)
+	}
+	if cmd == nil {
+		t.Fatalf("snapshots of the cached dataset must still load")
+	}
+	if m.loadingDatasets {
+		t.Fatalf("cached children must not trigger a dataset reload")
+	}
+	if len(m.children) != 1 || m.children[0].Name != "tank/data/a" {
+		t.Fatalf("children = %v, want cached tank/data/a", m.children)
+	}
+}
+
+func TestRefreshDropsDatasetCache(t *testing.T) {
+	m := newTestModel()
+	m = loadAll(t, m, "tank/data", []string{"tank/data/a"}, nil)
+	m = press(t, m, runeKey("enter"))
+	m = press(t, m, datasetsMsg{dataset: "tank/data/a"})
+	m = press(t, m, snapshotsMsg{dataset: "tank/data/a"})
+	m = press(t, m, runeKey("backspace"))
+	if len(m.cache) == 0 {
+		t.Fatalf("expected cached dataset paths")
+	}
+
+	m = press(t, m, runeKey("r"))
+	if len(m.cache) != 0 {
+		t.Fatalf("'r' must drop the cache, still has %d entries", len(m.cache))
+	}
+	if !m.loadingDatasets {
+		t.Fatalf("'r' must reload the current dataset")
+	}
+
+	m = press(t, m, runeKey("enter")) // descend again: must refetch
+	if !m.loadingDatasets {
+		t.Fatalf("navigation after refresh must refetch children")
+	}
+}

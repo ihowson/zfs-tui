@@ -22,6 +22,8 @@ Keywords follow RFC 2119: MUST, MUST NOT, SHOULD, MAY.
 - The TUI MUST use a consistent palette: accent for cursor and titles, blue for the pool row, cyan for child datasets, green for selection and success, amber for busy states, red for errors and confirmation, dim for secondary text
 - The focused pane MUST be visually distinct from the unfocused pane
 - Child datasets MUST be loaded and rendered before the snapshots of the same dataset are requested, and the snapshot pane MUST show progress while that request is in flight
+- Child dataset listings MUST be cached per dataset and reused when navigating back to a dataset, without refetching it; snapshots MUST still be reloaded
+- `r` MUST discard the cached dataset listings and refetch the current dataset
 - The CLI MUST accept `-color auto|always|never`; `auto` MUST honour `NO_COLOR` and `CLICOLOR_FORCE` and MUST fall back to a 256-color profile on a TTY when environment-based detection reports no color support
 
 ## 2026-07-26

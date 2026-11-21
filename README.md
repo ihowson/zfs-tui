@@ -50,7 +50,7 @@ The dataset pane lists the immediate child datasets of the dataset named in the 
 
 The snapshot pane always shows the snapshots of the dataset named in the header, and asks you to select a pool while none is selected. Selection is kept by snapshot name, so it survives refreshes.
 
-Child datasets are loaded and drawn before the snapshots of the current dataset are queried, so the browser is usable while the snapshot listing is still in flight.
+Child datasets are loaded and drawn before the snapshots of the current dataset are queried, so the browser is usable while the snapshot listing is still in flight. Child listings are cached per dataset: revisiting a dataset redraws its children immediately and only reloads the snapshots. Press `r` to discard the cache and refetch the current dataset.
 
 The dataset pane starts with a `pool` row naming the pool you are inside, so the location in the tree stays visible while you descend.
 
@@ -79,7 +79,7 @@ Destroys show `⠋ destroying snap-b… (2/4)` in the footer while the queue dra
 | `backspace` / `h` | Ascend to the parent dataset (dataset pane) |
 | `x` | Toggle selection on current snapshot (snapshot pane) |
 | `D` | Destroy all selected snapshots, after confirmation (snapshot pane) |
-| `r` | Refresh the current dataset |
+| `r` | Discard the dataset cache and refresh the current dataset |
 | `q` / `ctrl+c` | Quit |
 
 Destroy prompts with `Destroy N selected snapshot(s)? (y/n):`; press `y` to confirm or `n`/`esc` to cancel. Each destroy is displayed inline: `Destroying snap-b… (2/4)`.

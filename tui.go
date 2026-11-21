@@ -76,6 +76,7 @@ type model struct {
 	snapshots  []snapshotItem
 	snapCur    int
 	selected   map[string]bool // keyed by full snapshot name
+	cache      map[string]datasetCache
 
 	pane   pane
 	width  int
@@ -105,10 +106,18 @@ func initialModel(root string) model {
 		root:            root,
 		current:         root,
 		selected:        make(map[string]bool),
+		cache:           make(map[string]datasetCache),
 		loadingDatasets: true,
 		keys:            defaultKeyMap(),
 		spin:            spin,
 	}
+}
+
+// datasetCache holds the children of one dataset for the browser. Entries are
+// refreshed by startLoad and dropped entirely when 'r' is pressed.
+type datasetCache struct {
+	children []datasetItem
+	avail    uint64
 }
 
 // datasetsMsg carries the child datasets of one dataset. Results for a dataset
@@ -192,6 +201,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = nil
 		m.children = msg.children
 		m.avail = msg.avail
+		m.cache[msg.dataset] = datasetCache{children: msg.children, avail: msg.avail}
 		m.clampCursors()
 		if msg.dataset == "" {
 			m.snapshots = nil
@@ -297,6 +307,7 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.confirming = true
 		}
 	case key.Matches(msg, m.keys.Refresh):
+		m.cache = make(map[string]datasetCache)
 		return m.startLoad()
 	}
 
@@ -335,6 +346,18 @@ func (m model) navigate(target string) (tea.Model, tea.Cmd) {
 	m.selected = make(map[string]bool)
 	m.err = nil
 	m.status = ""
+
+	if cached, ok := m.cache[target]; ok {
+		m.children = cached.children
+		m.avail = cached.avail
+		m.loadingDatasets = false
+		if target == "" {
+			m.loadingSnapshots = false
+			return m, nil
+		}
+		m.loadingSnapshots = true
+		return m, tea.Batch(loadSnapshotsCmd(target), m.spin.Tick)
+	}
 	return m.startLoad()
 }
 

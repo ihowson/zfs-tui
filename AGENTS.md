@@ -45,6 +45,7 @@ go mod tidy
 - Palette lives in the `var` block at the top of `tui.go` (`accentStyle`, `pathStyle`, `poolStyle`, `dirStyle`, `dimStyle`, `selectedStyle`, `okStyle`, `busyStyle`, `dangerStyle`, `borderFocus`, `borderBlur`). Reuse these instead of new `lipgloss.Color` literals.
 - Long-running work is animated with `bubbles/spinner`: every transition into a busy state returns `m.spin.Tick`, `spinner.TickMsg` is dropped when `busy()` is false. Loading panes show `spinnerLine(...)`, never the empty-state text.
 - Footer status uses `statusOK` to pick green/red; destroy failures must be red.
+- `model.cache` maps a dataset name (including `""` for the pool list) to its `datasetCache`; it is filled by the `datasetsMsg` handler and read by `navigate`, which then only schedules the snapshot load. `r` clears the map. Snapshots are never cached.
 - Loading is staged: `startLoad` requests `datasetsMsg`; the `datasetsMsg` handler stores the children and returns `loadSnapshotsCmd`, and `snapshotsMsg` fills the snapshot pane. Do not fold the two back into one command — the browser must appear before snapshots resolve.
 - `-color` (`color.go`) configures the lipgloss profile before the program starts: `auto` honours `NO_COLOR`/`CLICOLOR_FORCE` and falls back to `ANSI256` when stdout is a TTY but detection reports no color. Tests force the profile with `lipgloss.SetColorProfile` when they assert color output.
 - Snapshot selection is a `map[string]bool` keyed by full snapshot name; prune it on every reload. Cursors are clamped after every reload.
